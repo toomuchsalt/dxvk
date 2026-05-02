@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <charconv>
 #ifdef MSC_VER
 #pragma fenv_access (on)
 #endif
@@ -9111,6 +9112,30 @@ namespace dxvk {
       "                ^ Format: ", EnumerateFormat(pPresentationParameters->AutoDepthStencilFormat), "\n",
       "    - Windowed:           ", pPresentationParameters->Windowed ? "true" : "false", "\n",
       "    - Swap effect:        ", pPresentationParameters->SwapEffect, "\n"));
+
+    const auto forcedSize = env::getEnvVar("D3D9_FORCE_SWAPCHAIN_SIZE");
+    if (!forcedSize.empty()) {
+      Logger::info(str::format("D3D9DeviceEx::ResetSwapChain: Forced size: ", forcedSize));
+
+      auto size = str::split(forcedSize, "x");
+      if (size.size() != 2) {
+        Logger::err(str::format("D3D9DeviceEx::ResetSwapChain: Invalid forced size: ", forcedSize));
+        return D3DERR_INVALIDCALL;
+      }
+
+      UINT width, height;
+
+      if (auto [ptr, err] = std::from_chars(size[0].begin(), size[0].end(), width); err != std::errc()) {
+        Logger::err(str::format("D3D9DeviceEx::ResetSwapChain: Invalid forced width: ", size[0]));
+        return D3DERR_INVALIDCALL;
+      }
+      if (auto [ptr, err] = std::from_chars(size[1].begin(), size[1].end(), height); err != std::errc()) {
+        Logger::err(str::format("D3D9DeviceEx::ResetSwapChain: Invalid forced height: ", size[1]));
+        return D3DERR_INVALIDCALL;
+      }
+      pPresentationParameters->BackBufferWidth = width;
+      pPresentationParameters->BackBufferHeight = height;
+    }
 
     // Black Desert creates a D3DDEVTYPE_NULLREF device and
     // expects this validation to not prevent a swapchain reset.

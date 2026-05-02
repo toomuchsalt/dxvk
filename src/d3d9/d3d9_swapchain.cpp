@@ -13,6 +13,30 @@ namespace dxvk {
     return uint16_t(65535.0f * x);
   }
 
+  static RECT fitDestRect(
+        const RECT& dstRect,
+        const RECT& srcRect) {
+    const LONG dstWidth = dstRect.right - dstRect.left;
+    const LONG dstHeight = dstRect.bottom - dstRect.top;
+
+    const LONG srcWidth = srcRect.right - srcRect.left;
+    const LONG srcHeight = srcRect.bottom - srcRect.top;
+
+    const double sx = double(dstWidth) / double(srcWidth);
+    const double sy = double(dstHeight) / double(srcHeight);
+    const double scale = std::min(sx, sy);
+
+    LONG scaledWidth = LONG(scale * srcWidth);
+    LONG scaledHeight = LONG(scale * srcHeight);
+
+    RECT out = {};
+    out.left = dstRect.left + (dstWidth - scaledWidth) / 2;
+    out.top = dstRect.top + (dstHeight - scaledHeight) / 2;
+    out.right = out.left + scaledWidth;
+    out.bottom = out.top + scaledHeight;
+    return out;
+  }
+
   D3D9SwapChainEx::D3D9SwapChainEx(
           D3D9DeviceEx*          pDevice,
           D3DPRESENT_PARAMETERS* pPresentParams,
@@ -1292,18 +1316,73 @@ namespace dxvk {
       mode.Size             = sizeof(D3DDISPLAYMODEEX);
     }
 
-    wsi::WsiMode wsiMode = ConvertDisplayMode(mode);
-    
+    const uint32_t desiredWidth  = mode.Width;
+    const uint32_t desiredHeight = mode.Height;
+    const uint32_t modeBpp       = GetMonitorFormatBpp(EnumerateFormat(mode.Format));
+    const uint32_t requestedHz   = mode.RefreshRate;
+
+    Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: requested ", desiredWidth, "x", desiredHeight,
+      " @ ", requestedHz, " Hz (bpp ", modeBpp, ")"));
+
     HMONITOR monitor = wsi::getDefaultMonitor();
 
-    if (!wsi::setWindowMode(monitor, m_window, &m_windowState, wsiMode))
+    wsi::WsiMode bestMode = { };
+    bool         found    = false;
+    uint32_t     bestResDist = std::numeric_limits<uint32_t>::max();
+
+    for (uint32_t i = 0; ; i++) {
+      wsi::WsiMode devMode = { };
+      if (!wsi::getDisplayMode(monitor, i, &devMode))
+        break;
+      if (devMode.interlaced)
+        continue;
+      if (devMode.bitsPerPixel != modeBpp)
+        continue;
+
+      Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: found mode ", devMode.width, "x", devMode.height));
+
+      if (devMode.height < desiredHeight || devMode.width < desiredWidth) {
+        Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: mode is too small ", devMode.width, "x", devMode.height));
+        continue;
+      }
+
+      const uint64_t devHz = devMode.refreshRate.denominator
+        ? uint64_t(devMode.refreshRate.numerator) / uint64_t(devMode.refreshRate.denominator)
+        : 0u;
+
+      if (requestedHz != 0 && devHz != requestedHz)
+        continue;
+
+      Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: found mode ", devMode.width, "x", devMode.height,
+        " @ ", devHz, " Hz"));
+
+      const uint32_t rw = devMode.width - desiredWidth;
+      const uint32_t rh = devMode.height - desiredHeight;
+      const uint32_t resDist = rw + rh;
+
+      if (resDist < bestResDist) {
+        Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: found better mode ", devMode.width, "x", devMode.height,
+          " @ ", devHz, " Hz, distance ", resDist));
+        found = true;
+        bestMode = devMode;
+        bestResDist = resDist;
+      }
+    }
+
+    if (!found)
+      return D3DERR_NOTAVAILABLE;
+
+    Logger::info(str::format("D3D9SwapChainEx::ChangeDisplayMode: chose mode ", bestMode.width, "x", bestMode.height,
+      " @ ", bestMode.refreshRate.numerator, "/", bestMode.refreshRate.denominator, " Hz"));
+
+    if (!wsi::setWindowMode(monitor, m_window, &m_windowState, bestMode))
       return D3DERR_NOTAVAILABLE;
 
     m_displayRefreshRate = 0.0;
 
-    if (wsi::getCurrentDisplayMode(monitor, &wsiMode)) {
-      m_displayRefreshRate = double(wsiMode.refreshRate.numerator)
-                           / double(wsiMode.refreshRate.denominator);
+    if (bestMode.refreshRate.denominator) {
+      m_displayRefreshRate = double(bestMode.refreshRate.numerator)
+                           / double(bestMode.refreshRate.denominator);
     }
 
     m_displayRefreshRateDirty = false;
@@ -1324,6 +1403,15 @@ namespace dxvk {
 
   void D3D9SwapChainEx::UpdatePresentRegion(const RECT* pSourceRect, const RECT* pDestRect) {
     const bool isWindowed = m_presentParams.Windowed;
+
+    Logger::info(str::format("D3D9SwapChainEx::UpdatePresentRegion: sourceRect: ", pSourceRect ? "true" : "false", " destRect: ", pDestRect ? "true" : "false"));
+    if (pSourceRect) {
+      Logger::info(str::format("D3D9SwapChainEx::UpdatePresentRegion: sourceRect left: ", pSourceRect->left, " top: ", pSourceRect->top, " right: ", pSourceRect->right, " bottom: ", pSourceRect->bottom));
+    }
+
+    if (pDestRect) {
+      Logger::info(str::format("D3D9SwapChainEx::UpdatePresentRegion: destRect left: ", pDestRect->left, " top: ", pDestRect->top, " right: ", pDestRect->right, " bottom: ", pDestRect->bottom));
+    }
 
     // Tests show that present regions are ignored in fullscreen
 
@@ -1347,7 +1435,7 @@ namespace dxvk {
       dstRect.left   = 0;
       dstRect.right  = LONG(width);
       dstRect.bottom = LONG(height);
-      
+      dstRect = fitDestRect(dstRect, m_srcRect);
     }
     else
       dstRect = *pDestRect;
