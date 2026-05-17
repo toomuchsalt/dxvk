@@ -5318,6 +5318,11 @@ namespace dxvk {
     // The texture converter cannot handle converting back. So just keep textures in memory as a workaround.
     shouldToss &= pResource->GetFormatMapping().ConversionFormatInfo.FormatType == D3D9ConversionFormat_None;
 
+    // Render targets and depth stencils always re-readback from the GPU on the next lock
+    // (usage flags force needsReadback regardless of MarkAllNeedReadback), so destroying
+    // the staging buffer only to reallocate it on the next lock wastes a lot of time.
+    shouldToss &= !pResource->IsRenderTarget() && !pResource->IsDepthStencil();
+
     if (shouldToss)
       pResource->DestroyBuffer();
 
