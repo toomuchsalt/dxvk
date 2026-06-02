@@ -5,10 +5,10 @@
 
 namespace dxvk {
 
-  enum class D3D9FloatEmulation {
-    Disabled,
-    Enabled,
-    Strict
+  enum class D3D9FloatEmulation : uint8_t {
+    Disabled = 0,
+    Enabled  = 1,
+    Strict   = 2
   };
 
   struct D3D9Options {
@@ -72,6 +72,12 @@ namespace dxvk {
 
     /// D3D9 Floating Point Emulation (anything * 0 = 0)
     D3D9FloatEmulation d3d9FloatEmulation;
+
+    /// Whether shaders use FP16 for partial precision instructions
+    bool useFP16;
+
+    /// Support depth formats for cube textures
+    bool supportCubeDepthFormats;
 
     /// Support the DF16 & DF24 texture format
     bool supportDFFormats;
@@ -162,11 +168,8 @@ namespace dxvk {
     /// Add an extra front buffer to make GetFrontBufferData() work correctly when the swapchain only has a single buffer
     bool extraFrontbuffer;
 
-    /// Use the uber shader for fixed function vertex shaders.
-    bool ffUbershaderVS;
-
-    /// Use the uber shader for fixed function fragment shaders.
-    bool ffUbershaderFS;
+    // Use the new DXBC-SPIRV based shader compiler.
+    bool useDxbcSpirv;
   };
 
 }

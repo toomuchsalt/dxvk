@@ -1559,6 +1559,18 @@ namespace dxvk {
           return spv::BuiltInPointSize;
         case dxbc_spv::ir::BuiltIn::eTessFactorLimit:
           return std::nullopt;
+        case dxbc_spv::ir::BuiltIn::ePointCoord:
+          return spv::BuiltInPointCoord;
+        case dxbc_spv::ir::BuiltIn::eLegacyAlphaTest:
+        case dxbc_spv::ir::BuiltIn::eLegacyFog:
+        case dxbc_spv::ir::BuiltIn::eLegacyClipPlanes:
+        case dxbc_spv::ir::BuiltIn::eLegacyPointArgs:
+        case dxbc_spv::ir::BuiltIn::eLegacySamplerState:
+        case dxbc_spv::ir::BuiltIn::eLegacyTextureStage:
+        case dxbc_spv::ir::BuiltIn::eLegacyConstFloat:
+        case dxbc_spv::ir::BuiltIn::eLegacyConstInt:
+        case dxbc_spv::ir::BuiltIn::eLegacyConstBool:
+          return std::nullopt;
       }
 
       return std::nullopt;
@@ -2115,6 +2127,10 @@ namespace dxvk {
         return dxbc_spv::ir::BuiltIn::eLocalThreadId;
       case spv::BuiltInLocalInvocationIndex:
         return dxbc_spv::ir::BuiltIn::eLocalThreadIndex;
+      case spv::BuiltInPointSize:
+        return dxbc_spv::ir::BuiltIn::ePointSize;
+      case spv::BuiltInPointCoord:
+        return dxbc_spv::ir::BuiltIn::ePointCoord;
       default:
         return std::nullopt;
     }

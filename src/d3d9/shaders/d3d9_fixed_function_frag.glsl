@@ -195,7 +195,6 @@ vec4 calculateFog(vec4 vPos, vec4 oColor) {
         case D3DFOG_LINEAR:
             fogFactor = fogEnd - depth;
             fogFactor = fogFactor * fogScale;
-            fogFactor = spvNClamp(fogFactor, 0.0, 1.0);
             break;
 
         // 1 / (e^[d * density])^2
@@ -212,6 +211,8 @@ vec4 calculateFog(vec4 vPos, vec4 oColor) {
             fogFactor = exp(fogFactor);
             break;
     }
+
+    fogFactor = spvNClamp(fogFactor, 0.0, 1.0);
 
     vec4 color = oColor;
     vec3 color3 = color.rgb;
@@ -400,13 +401,13 @@ vec4 calculateTextureStage(uint op, vec4 dst, const TextureStageArgumentValues a
             return arg.arg2;
 
         case D3DTOP_MODULATE4X:
-            return arg.arg1 * arg.arg2 * 4.0;
+            return saturate(arg.arg1 * arg.arg2 * 4.0);
 
         case D3DTOP_MODULATE2X:
-            return arg.arg1 * arg.arg2 * 2.0;
+            return saturate(arg.arg1 * arg.arg2 * 2.0);
 
         case D3DTOP_MODULATE:
-            return arg.arg1 * arg.arg2;
+            return saturate(arg.arg1 * arg.arg2);
 
         case D3DTOP_ADDSIGNED2X:
             return saturate(2.0 * (arg.arg1 + (arg.arg2 - vec4(0.5))));
@@ -421,7 +422,7 @@ vec4 calculateTextureStage(uint op, vec4 dst, const TextureStageArgumentValues a
             return saturate(arg.arg1 - arg.arg2);
 
         case D3DTOP_ADDSMOOTH:
-            return fma(complement(arg.arg1), arg.arg2, arg.arg1);
+            return saturate(fma(complement(arg.arg1), arg.arg2, arg.arg1));
 
         case D3DTOP_BLENDDIFFUSEALPHA:
             return mix(arg.arg2, arg.arg1, in_Color0.aaaa);
@@ -500,7 +501,7 @@ void alphaTest() {
         // Adjust alpha to the given range and round
         float alphaFactor = float((256u << alphaPrecision) - 1u);
 
-        alpha = round(alpha * alphaFactor);
+        alpha = roundEven(alpha * alphaFactor);
     } else {
         alphaRef = float(alphaRefInitial) / 255.0;
     }
@@ -553,6 +554,28 @@ struct TextureStageState {
     vec4 previousStageTextureVal;
 };
 
+vec4 getTexCoord(uint stage) {
+    const uint pointMode = specUint(SpecPointMode);
+
+    // If point sprites are enabled, we need to replace the
+    // input texture coordinate with the point coordinate
+    if (bitfieldExtract(pointMode, 1, 1) == 1u)
+        return vec4(gl_PointCoord, 0.0f, 0.0f);
+
+    switch (stage) {
+        case 0: return in_Texcoord0;
+        case 1: return in_Texcoord1;
+        case 2: return in_Texcoord2;
+        case 3: return in_Texcoord3;
+        case 4: return in_Texcoord4;
+        case 5: return in_Texcoord5;
+        case 6: return in_Texcoord6;
+        case 7: return in_Texcoord7;
+    }
+
+    return vec4(0.0f);
+}
+
 TextureStageState runTextureStage(uint stage, TextureStageState state) {
     if (stage > specUint(SpecFFLastActiveTextureStage)) {
         return state;
@@ -582,38 +605,10 @@ TextureStageState runTextureStage(uint stage, TextureStageState state) {
         specIsOptimized() ? repackArg(specUint(SpecFFTextureStage0AlphaArg2 + PerTextureStageSpecConsts * stage)) : alphaArg2(stage)
     };
 
-    vec4 textureVal = vec4(0.0);
-    bool usesTexture = (colorArgs.arg0 & D3DTA_SELECTMASK) == D3DTA_TEXTURE
-        || (colorArgs.arg1 & D3DTA_SELECTMASK) == D3DTA_TEXTURE
-        || (colorArgs.arg2 & D3DTA_SELECTMASK) == D3DTA_TEXTURE
-        || (alphaArgs.arg0 & D3DTA_SELECTMASK) == D3DTA_TEXTURE
-        || (alphaArgs.arg1 & D3DTA_SELECTMASK) == D3DTA_TEXTURE
-        || (alphaArgs.arg2 & D3DTA_SELECTMASK) == D3DTA_TEXTURE;
+    vec4 textureVal = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-    if (usesTexture) {
-        // We need to replace TEXCOORD inputs with gl_PointCoord
-        // if D3DRS_POINTSPRITEENABLE is set.
-        const uint pointMode = specUint(SpecPointMode);
-        const bool isSprite = bitfieldExtract(pointMode, 1, 1) == 1u;
-
-        vec4 texCoord;
-        if (isSprite) {
-            texCoord = vec4(gl_PointCoord, 0.0, 0.0);
-        } else {
-            switch (stage) {
-                case 0: texCoord = in_Texcoord0; break;
-                case 1: texCoord = in_Texcoord1; break;
-                case 2: texCoord = in_Texcoord2; break;
-                case 3: texCoord = in_Texcoord3; break;
-                case 4: texCoord = in_Texcoord4; break;
-                case 5: texCoord = in_Texcoord5; break;
-                case 6: texCoord = in_Texcoord6; break;
-                case 7: texCoord = in_Texcoord7; break;
-            }
-        }
-        const vec4 unboundTextureConst = vec4(0.0, 0.0, 0.0, 1.0);
-        textureVal = !specBool(SpecSamplerNull, stage) ? sampleTexture(stage, texCoord, state.previousStageTextureVal) : unboundTextureConst;
-    }
+    if (!specBool(SpecSamplerNull, stage))
+        textureVal = sampleTexture(stage, getTexCoord(stage), state.previousStageTextureVal);
 
     // Fast path if alpha/color path is identical.
     // D3DTOP_DOTPRODUCT3 also has special quirky behaviour here.

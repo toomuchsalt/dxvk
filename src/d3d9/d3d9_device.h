@@ -1227,20 +1227,6 @@ namespace dxvk {
     }
 
     /**
-     * \brief Returns the number of vertex shader modules generated for fixed function state.
-     */
-    UINT GetFixedFunctionVSCount() const {
-      return m_ffModules.GetVSCount();
-    }
-
-    /**
-     * \brief Returns the number of fragment shader modules generated for fixed function state.
-     */
-    UINT GetFixedFunctionFSCount() const {
-      return m_ffModules.GetFSCount();
-    }
-
-    /**
      * \brief Returns the number of shader modules generated for ProcessVertices.
      */
     UINT GetSWVPShaderCount() const {
@@ -1271,6 +1257,10 @@ namespace dxvk {
 
     D3D9Adapter* GetAdapter() const {
       return m_adapter;
+    }
+
+    DxvkShaderOptions GetShaderOptions() const {
+      return m_dxvkShaderOptions;
     }
 
   private:
@@ -1331,7 +1321,7 @@ namespace dxvk {
     HRESULT CreateShaderModule(
             D3D9CommonShader*     pShaderModule,
             size_t*               pLength,
-            VkShaderStageFlagBits ShaderStage,
+            D3D9ShaderType        ShaderType,
       const DWORD*                pShaderBytecode);
 
     inline uint32_t GetUPDataSize(uint32_t vertexCount, uint32_t stride) {
