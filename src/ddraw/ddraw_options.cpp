@@ -17,6 +17,7 @@ namespace dxvk {
     this->forceLegacyBuffers     = config.getOption<bool>   ("ddraw.forceLegacyBuffers",     false);
     this->cpuProcessVertices     = config.getOption<bool>   ("ddraw.cpuProcessVertices",      true);
     this->backBufferResize       = config.getOption<bool>   ("ddraw.backBufferResize",        true);
+    this->cpuBackBufferShadow    = config.getOption<bool>   ("ddraw.cpuBackBufferShadow",     false);
     this->forceLegacyPresent     = config.getOption<bool>   ("ddraw.forceLegacyPresent",     false);
     this->systemMemoryShadow     = config.getOption<bool>   ("ddraw.systemMemoryShadow",      true);
     this->forceRTFlip            = config.getOption<bool>   ("ddraw.forceRTFlip",            false);

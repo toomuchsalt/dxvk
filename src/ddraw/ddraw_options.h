@@ -70,6 +70,9 @@ namespace dxvk {
     /// Resize the back buffer size to screen size when needed
     bool backBufferResize;
 
+    /// Keep CPU-accessible back-buffer data in a system-memory shadow surface
+    bool cpuBackBufferShadow;
+
     /// Blits back to the proxied flippable surface and back again for presentation
     bool forceLegacyPresent;
 

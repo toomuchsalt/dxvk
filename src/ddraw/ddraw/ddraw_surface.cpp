@@ -63,8 +63,10 @@ namespace dxvk {
 
     DDrawInterface* ddrawIntf = m_commonIntf->GetDDInterface();
     // Create an offscreen plain shadow surface in system memory, if needed
-    if (unlikely(m_commonSurf->IsPrimarySurface() &&
-                 m_commonIntf->GetOptions()->forceLegacyPresent &&
+    if (unlikely(((m_commonSurf->IsPrimarySurface() &&
+                  m_commonIntf->GetOptions()->forceLegacyPresent) ||
+                 (m_commonSurf->IsBackBufferOrFlippable() &&
+                  m_commonIntf->GetOptions()->cpuBackBufferShadow)) &&
                  ddrawIntf != nullptr &&
                 !m_commonSurf->SkipD3D9Operations())) {
       const DDSURFACEDESC* surfaceDesc = m_commonSurf->GetDesc();
@@ -459,7 +461,7 @@ namespace dxvk {
 
     m_commonSurf->DirtyDDrawSurface();
 
-    if (m_shadowSurf != nullptr && d3d9Device != nullptr) {
+    if (m_shadowSurf != nullptr && m_commonSurf->IsPrimarySurface() && d3d9Device != nullptr) {
       const bool shouldPresent = m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Auto ?
                                 !m_commonSurf->GetCommonD3DDevice()->IsInScene() :
                                  m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Strict ?
@@ -531,7 +533,7 @@ namespace dxvk {
 
     m_commonSurf->DirtyDDrawSurface();
 
-    if (m_shadowSurf != nullptr && d3d9Device != nullptr) {
+    if (m_shadowSurf != nullptr && m_commonSurf->IsPrimarySurface() && d3d9Device != nullptr) {
       const bool shouldPresent = m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Auto ?
                                 !m_commonSurf->GetCommonD3DDevice()->IsInScene() :
                                  m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Strict ?
@@ -902,7 +904,7 @@ namespace dxvk {
 
     m_commonSurf->DirtyDDrawSurface();
 
-    if (m_shadowSurf != nullptr) {
+    if (m_shadowSurf != nullptr && m_commonSurf->IsPrimarySurface()) {
       d3d9::IDirect3DDevice9* d3d9Device = m_commonSurf->GetRefreshedD3D9Device();
       if (likely(d3d9Device != nullptr)) {
         const bool shouldPresent = m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Auto ?
@@ -1023,7 +1025,7 @@ namespace dxvk {
     if (!m_readOnlyLock) {
       m_commonSurf->DirtyDDrawSurface();
 
-      if (m_shadowSurf != nullptr) {
+      if (m_shadowSurf != nullptr && m_commonSurf->IsPrimarySurface()) {
         d3d9::IDirect3DDevice9* d3d9Device = m_commonSurf->GetRefreshedD3D9Device();
         if (likely(d3d9Device != nullptr)) {
           const bool shouldPresent = m_commonIntf->GetOptions()->legacyPresentGuard == D3DLegacyPresentGuard::Auto ?
