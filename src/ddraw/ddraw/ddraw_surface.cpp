@@ -487,6 +487,46 @@ namespace dxvk {
       return DDERR_UNSUPPORTED;
     }
 
+    // Keep opaque video-memory blits on the GPU. Preserve the CPU fallback
+    // for unsupported surfaces, formats, flags, clipping and device combinations.
+    if (m_commonIntf->GetOptions()->gpuBltFast && lpDDSrcSurface != nullptr && lpDDSrcSurface != this
+        && !(dwTrans & ~(DDBLTFAST_WAIT | DDBLTFAST_DONOTWAIT))) {
+      auto source = static_cast<DDrawSurface*>(lpDDSrcSurface);
+      auto src = source->GetCommonSurface();
+      auto dst = m_commonSurf.ptr();
+      RECT sr = lpSrcRect ? *lpSrcRect : *src->GetFullSurfaceRect();
+      const auto sb = src->GetFullSurfaceRect();
+      const auto db = dst->GetFullSurfaceRect();
+      if (!dst->IsPrimarySurface() && !src->IsPrimarySurface()
+          && src->IsInVideoMemory() && dst->IsInVideoMemory()
+          && !src->IsDepthStencil() && !dst->IsDepthStencil()
+          && !src->IsDXTFormat() && !dst->IsDXTFormat()
+          && dst->GetClipper() == nullptr && src->GetClipper() == nullptr
+          && !src->IsBindableAsTexture() && !dst->IsBindableAsTexture()
+          && src->GetD3D9Format() == dst->GetD3D9Format()
+          && !src->SkipD3D9Operations() && !dst->SkipD3D9Operations()
+          && sr.left >= 0 && sr.top >= 0 && sr.right > sr.left && sr.bottom > sr.top
+          && sr.right <= sb->right && sr.bottom <= sb->bottom
+          && dwX <= DWORD(db->right) && dwY <= DWORD(db->bottom)
+          && DWORD(sr.right - sr.left) <= DWORD(db->right) - dwX
+          && DWORD(sr.bottom - sr.top) <= DWORD(db->bottom) - dwY) {
+        auto device = dst->GetRefreshedD3D9Device();
+        if (device != nullptr && device == src->GetRefreshedD3D9Device()
+            && SUCCEEDED(source->InitializeOrUploadD3D9())
+            && SUCCEEDED(InitializeOrUploadD3D9())) {
+          RECT dr = { LONG(dwX), LONG(dwY), LONG(dwX) + sr.right - sr.left,
+                      LONG(dwY) + sr.bottom - sr.top };
+          HRESULT hr = device->StretchRect(src->GetD3D9Surface(), &sr,
+            dst->GetD3D9Surface(), &dr, d3d9::D3DTEXF_NONE);
+          if (SUCCEEDED(hr)) {
+            // CPU access will download the new contents on demand.
+            dst->DirtyD3D9Surface();
+            return DD_OK;
+          }
+        }
+      }
+    }
+
     const RECT* sourceFullSurfaceRect = nullptr;
     // Write back any dirty surface data from bound D3D9 back buffers or
     // depth stencils, for both the source surface and the current surface

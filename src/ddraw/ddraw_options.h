@@ -85,6 +85,9 @@ namespace dxvk {
     /// Forwards all DC operations to D3D9 surfaces
     bool forceDCForwarding;
 
+    /// Use GPU copies for eligible opaque IDirectDrawSurface::BltFast operations
+    bool gpuBltFast;
+
     /// Emulate an explicit D3D9 front buffer by uploading its content from DDraw
     bool emulateFrontBuffer;
 

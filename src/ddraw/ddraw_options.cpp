@@ -31,6 +31,7 @@ namespace dxvk {
     this->nonLocalVideoMemory    = config.getOption<bool>   ("ddraw.nonLocalVideoMemory",     true);
     this->inverseLodBiasScale    = config.getOption<bool>   ("ddraw.inverseLodBiasScale",    false);
     this->robustTextureLifeCycle = config.getOption<bool>   ("ddraw.robustTextureLifeCycle", false);
+    this->gpuBltFast             = config.getOption<bool>   ("ddraw.gpuBltFast",             false);
     this->supportOverlays        = config.getOption<bool>   ("ddraw.supportOverlays",         true);
     this->apitraceMode           = config.getOption<bool>   ("ddraw.apitraceMode",           false);
 
