@@ -41,6 +41,7 @@ namespace dxvk {
     this->hideNvkGpu                    = config.getOption<Tristate>    ("d3d9.hideNvkGpu",                    Tristate::Auto) == Tristate::True;
     this->hideAmdGpu                    = config.getOption<Tristate>    ("d3d9.hideAmdGpu",                    Tristate::Auto) == Tristate::True;
     this->hideIntelGpu                  = config.getOption<Tristate>    ("d3d9.hideIntelGpu",                  Tristate::True) == Tristate::True;
+    this->directBufferUpload            = config.getOption<bool>        ("d3d9.directBufferUpload",           false);
     this->maxFrameLatency               = config.getOption<int32_t>     ("d3d9.maxFrameLatency",               0);
     this->maxFrameRate                  = config.getOption<int32_t>     ("dxvk.maxFrameRate",
                                           config.getOption<int32_t>     ("d3d9.maxFrameRate",                  0));

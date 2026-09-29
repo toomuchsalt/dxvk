@@ -43,6 +43,9 @@ namespace dxvk {
     /// a higher value. May help with frame timing issues.
     int32_t maxFrameLatency;
 
+    /// Reuse mapping buffers for eligible whole render-target uploads
+    bool directBufferUpload;
+
     /// Limit frame rate
     int32_t maxFrameRate;
 

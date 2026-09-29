@@ -5384,32 +5384,69 @@ namespace dxvk {
           + srcOffsetBlockCount.y * pitch
           + srcOffsetBlockCount.x * formatInfo->elementSize;
 
-      // Get the mapping pointer from MapTexture to map the texture and keep track of that
-      // in case it is unmappable.
-      const void* mapPtr = MapTexture(pSrcTexture, SrcSubresource);
       VkDeviceSize dirtySize = extentBlockCount.width * extentBlockCount.height * extentBlockCount.depth * formatInfo->elementSize;
-      D3D9BufferSlice slice = AllocStagingBuffer(dirtySize);
-      const void* srcData = reinterpret_cast<const uint8_t*>(mapPtr) + copySrcOffset;
-      util::packImageData(
-        slice.mapPtr, srcData, extentBlockCount, formatInfo->elementSize,
-        pitch, pitch * srcTexLevelExtentBlockCount.height);
-
       VkFormat packedDSFormat = GetPackedDepthStencilFormat(pDestTexture->Desc()->Format);
 
-      EmitCs([
-        cSrcSlice       = slice.slice,
-        cDstImage       = image,
-        cDstLayers      = dstLayers,
-        cDstLevelExtent = alignedExtent,
-        cOffset         = alignedDestOffset,
-        cPackedDSFormat = packedDSFormat
-      ] (DxvkContext* ctx) {
-        ctx->copyBufferToImage(
-          cDstImage,  cDstLayers,
-          cOffset, cDstLevelExtent,
-          cSrcSlice.buffer(), cSrcSlice.offset(),
-          0, 0, cPackedDSFormat);
-      });
+      // For a whole, uncompressed subresource the existing host-visible
+      // mapping buffer already has the row pitch Vulkan needs. Reuse it
+      // instead of packing another full-frame staging allocation.
+      const bool directBufferUpload =
+          m_d3d9Options.directBufferUpload
+       && pSrcTexture == pDestTexture
+       && SrcSubresource == DestSubresource
+       && pSrcTexture->IsRenderTarget()
+       && pSrcTexture->GetBuffer() != nullptr
+       && !formatInfo->flags.test(DxvkFormatFlag::MultiPlane)
+       && !formatInfo->flags.test(DxvkFormatFlag::BlockCompressed)
+       && alignedDestOffset.x == 0 && alignedDestOffset.y == 0 && alignedDestOffset.z == 0
+       && alignedSrcOffset.x == 0 && alignedSrcOffset.y == 0 && alignedSrcOffset.z == 0
+       && alignedExtent.width  == dstTexLevelExtent.width
+       && alignedExtent.height == dstTexLevelExtent.height
+       && alignedExtent.depth  == dstTexLevelExtent.depth
+       && alignedExtent.width  == srcTexLevelExtent.width
+       && alignedExtent.height == srcTexLevelExtent.height
+       && alignedExtent.depth  == srcTexLevelExtent.depth
+       && copySrcOffset == 0
+       && dirtySize == pSrcTexture->GetMipSize(SrcSubresource);
+
+      if (directBufferUpload) {
+        MapTexture(pSrcTexture, SrcSubresource);
+        DxvkBufferSlice srcSlice = pSrcTexture->GetBufferSlice(SrcSubresource);
+        EmitCs([
+          cSrcSlice       = std::move(srcSlice),
+          cDstImage       = image,
+          cDstLayers      = dstLayers,
+          cDstLevelExtent = alignedExtent,
+          cOffset         = alignedDestOffset,
+          cPackedDSFormat = packedDSFormat,
+          cPitch          = pitch
+        ] (DxvkContext* ctx) {
+          ctx->copyBufferToImage(
+            cDstImage, cDstLayers, cOffset, cDstLevelExtent,
+            cSrcSlice.buffer(), cSrcSlice.offset(), cPitch, 0, cPackedDSFormat);
+        });
+      } else {
+        // Other formats and partial writes retain the packed staging path.
+        const void* mapPtr = MapTexture(pSrcTexture, SrcSubresource);
+        D3D9BufferSlice slice = AllocStagingBuffer(dirtySize);
+        const void* srcData = reinterpret_cast<const uint8_t*>(mapPtr) + copySrcOffset;
+        util::packImageData(
+          slice.mapPtr, srcData, extentBlockCount, formatInfo->elementSize,
+          pitch, pitch * srcTexLevelExtentBlockCount.height);
+
+        EmitCs([
+          cSrcSlice       = slice.slice,
+          cDstImage       = image,
+          cDstLayers      = dstLayers,
+          cDstLevelExtent = alignedExtent,
+          cOffset         = alignedDestOffset,
+          cPackedDSFormat = packedDSFormat
+        ] (DxvkContext* ctx) {
+          ctx->copyBufferToImage(
+            cDstImage, cDstLayers, cOffset, cDstLevelExtent,
+            cSrcSlice.buffer(), cSrcSlice.offset(), 0, 0, cPackedDSFormat);
+        });
+      }
 
       TrackTextureMappingBufferSequenceNumber(pSrcTexture, SrcSubresource);
     }
