@@ -869,6 +869,27 @@ namespace dxvk {
         {  int32_t(m_dstRect.left),                    int32_t(m_dstRect.top)                    },
         { uint32_t(m_dstRect.right - m_dstRect.left), uint32_t(m_dstRect.bottom - m_dstRect.top) } };
 
+      if (m_parent->GetOptions()->preserveAspectRatio
+          && srcRect.extent.width && srcRect.extent.height
+          && dstRect.extent.width && dstRect.extent.height) {
+        // Fit the source aspect ratio in the destination without cropping.
+        // Use 64-bit products for large resolutions and center the remaining
+        // area, which the presentation blitter clears to black.
+        auto& extent = dstRect.extent;
+        if (uint64_t(extent.width) * srcRect.extent.height
+            > uint64_t(extent.height) * srcRect.extent.width) {
+          const uint32_t width = std::max(1u, uint32_t(
+            uint64_t(extent.height) * srcRect.extent.width / srcRect.extent.height));
+          dstRect.offset.x += int32_t((extent.width - width) / 2);
+          extent.width = width;
+        } else {
+          const uint32_t height = std::max(1u, uint32_t(
+            uint64_t(extent.width) * srcRect.extent.height / srcRect.extent.width));
+          dstRect.offset.y += int32_t((extent.height - height) / 2);
+          extent.height = height;
+        }
+      }
+
       // Bump frame ID
       m_wctx->frameId += 1;
 

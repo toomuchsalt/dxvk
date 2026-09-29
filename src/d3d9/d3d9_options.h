@@ -58,6 +58,9 @@ namespace dxvk {
     /// Whether or not to do a fast path clear if we're close enough to the whole render target.
     bool lenientClear;
 
+    /// Fit the source image inside the presentation area with black bars
+    bool preserveAspectRatio;
+
     /// Defer surface creation
     bool deferSurfaceCreation;
 

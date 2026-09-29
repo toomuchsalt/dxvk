@@ -571,6 +571,9 @@ namespace dxvk {
   }
 
   HRESULT STDMETHODCALLTYPE DDraw4Surface::Flip(LPDIRECTDRAWSURFACE4 lpDDSurfaceTargetOverride, DWORD dwFlags) {
+    // Input acquisition and focus changes can replace the proxy's cursor clip.
+    m_commonIntf->UpdateCursorClip();
+
     if (unlikely(lpDDSurfaceTargetOverride != nullptr
              && !DDrawCommonInterface::IsWrappedSurface(lpDDSurfaceTargetOverride))) {
       Logger::err("DDraw4Surface::Flip: Received an unwrapped override surface");

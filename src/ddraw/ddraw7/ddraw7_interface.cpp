@@ -481,6 +481,8 @@ namespace dxvk {
 
     const D3DOptions* d3dOptions = m_commonIntf->GetOptions();
 
+    m_commonIntf->ApplyRenderMode(lpDDSurfaceDesc);
+
     if (unlikely(d3dOptions->mask8BitModes
               && lpDDSurfaceDesc->dwFlags & DDSD_PIXELFORMAT
               && lpDDSurfaceDesc->ddpfPixelFormat.dwRGBBitCount == 8)) {
@@ -564,7 +566,10 @@ namespace dxvk {
   }
 
   HRESULT STDMETHODCALLTYPE DDraw7Interface::RestoreDisplayMode() {
-    return m_proxy->RestoreDisplayMode();
+    HRESULT hr = m_proxy->RestoreDisplayMode();
+    if (SUCCEEDED(hr))
+      m_commonIntf->ClearRenderMode();
+    return hr;
   }
 
   HRESULT STDMETHODCALLTYPE DDraw7Interface::SetCooperativeLevel(HWND hWnd, DWORD dwFlags) {
@@ -589,9 +594,16 @@ namespace dxvk {
   HRESULT STDMETHODCALLTYPE DDraw7Interface::SetDisplayMode(DWORD dwWidth, DWORD dwHeight, DWORD dwBPP, DWORD dwRefreshRate, DWORD dwFlags) {
     Logger::debug(str::format("DDraw7Interface::SetDisplayMode: ", dwWidth, "x", dwHeight, ":", dwBPP, "@", dwRefreshRate));
 
-    HRESULT hr = m_proxy->SetDisplayMode(dwWidth, dwHeight, dwBPP, dwRefreshRate, dwFlags);
+    DWORD outputWidth = dwWidth, outputHeight = dwHeight, outputRefreshRate = dwRefreshRate;
+    HRESULT hr = m_commonIntf->GetOutputMode(outputWidth, outputHeight, outputRefreshRate);
+    if (FAILED(hr))
+      return hr;
+
+    hr = m_proxy->SetDisplayMode(outputWidth, outputHeight, dwBPP, outputRefreshRate, dwFlags);
     if (unlikely(FAILED(hr)))
       return hr;
+
+    m_commonIntf->SetRenderMode(dwWidth, dwHeight);
 
     DDrawCommonSurface* ps = m_commonIntf->GetPrimarySurface();
 

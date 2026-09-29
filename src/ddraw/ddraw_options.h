@@ -67,6 +67,9 @@ namespace dxvk {
     /// Process vertices on the CPU, instead of relaying to D3D9
     bool cpuProcessVertices;
 
+    /// Keep desktop output dimensions for legacy exclusive display modes
+    bool forceDesktopMode;
+
     /// Resize the back buffer size to screen size when needed
     bool backBufferResize;
 

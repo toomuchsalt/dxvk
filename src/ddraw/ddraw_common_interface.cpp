@@ -8,6 +8,8 @@
 
 #include "d3d3/d3d3_interface.h"
 
+#include "../wsi/wsi_monitor.h"
+
 #include <algorithm>
 
 namespace dxvk {
@@ -19,6 +21,50 @@ namespace dxvk {
   }
 
   DDrawCommonInterface::~DDrawCommonInterface() {
+  }
+
+  HRESULT DDrawCommonInterface::GetOutputMode(DWORD& width, DWORD& height, DWORD& refreshRate) const {
+    if (!UsesDesktopMode())
+      return DD_OK;
+    if (!width || !height || width > uint32_t(INT32_MAX) / 4 || height > uint32_t(INT32_MAX))
+      return DDERR_INVALIDMODE;
+
+    const HMONITOR monitor = MonitorFromWindow(GetHWND(), MONITOR_DEFAULTTOPRIMARY);
+    wsi::WsiMode mode = { };
+    if (!wsi::getDesktopDisplayMode(monitor, &mode) || !mode.width || !mode.height)
+      return DDERR_UNSUPPORTEDMODE;
+
+    Logger::info(str::format("DDraw: Rendering ", width, "x", height,
+      " in desktop mode ", mode.width, "x", mode.height));
+    width = mode.width;
+    height = mode.height;
+    // The application's refresh rate belongs to its virtual render mode.
+    // Keep the desktop refresh rate for the physical output mode.
+    refreshRate = mode.refreshRate.denominator
+      ? mode.refreshRate.numerator / mode.refreshRate.denominator : 0;
+    return DD_OK;
+  }
+
+  void DDrawCommonInterface::UpdateCursorClip() {
+    if (!m_renderMode.width || !m_renderMode.height)
+      return;
+
+    const HWND window = GetHWND();
+    if (GetForegroundWindow() != window || IsIconic(window))
+      return;
+
+    POINT origin = { 0, 0 };
+    RECT current;
+    if (!ClientToScreen(window, &origin) || !GetClipCursor(&current))
+      return;
+
+    // Keep tighter application clipping, but constrain software cursors to
+    // the render area instead of the proxy's desktop-sized display mode.
+    RECT render = { origin.x, origin.y,
+      origin.x + LONG(m_renderMode.width), origin.y + LONG(m_renderMode.height) };
+    RECT clip;
+    if (IntersectRect(&clip, &current, &render) && !EqualRect(&clip, &current))
+      ClipCursor(&clip);
   }
 
   HRESULT STDMETHODCALLTYPE DDrawCommonInterface::QueryInterface(REFIID riid, void** ppvObject) {

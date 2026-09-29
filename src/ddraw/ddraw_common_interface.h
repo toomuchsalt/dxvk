@@ -113,6 +113,8 @@ namespace dxvk {
     void SetCooperativeLevel(HWND hWnd, DWORD dwFlags) {
       m_hWnd = hWnd;
       m_cooperativeLevel = dwFlags;
+      if (!(dwFlags & DDSCL_EXCLUSIVE))
+        ClearRenderMode();
     }
 
     DWORD GetCooperativeLevel() const {
@@ -143,6 +145,39 @@ namespace dxvk {
     DDrawCommonSurface* GetPrimarySurface() {
       return m_ps;
     }
+
+    bool UsesDesktopMode() const {
+      return m_d3dOptions.forceDesktopMode && (m_cooperativeLevel & DDSCL_EXCLUSIVE);
+    }
+
+    HRESULT GetOutputMode(DWORD& width, DWORD& height, DWORD& refreshRate) const;
+
+    void SetRenderMode(DWORD width, DWORD height) {
+      m_renderMode = UsesDesktopMode() ? DDrawModeSize { width, height } : DDrawModeSize { };
+      if (m_renderMode.width)
+        m_modeSize = m_renderMode;
+    }
+
+    void ClearRenderMode() {
+      if (m_renderMode.width) {
+        m_renderMode = { };
+        m_modeSize = { };
+      }
+    }
+
+    template<typename DescType>
+    void ApplyRenderMode(DescType* desc) const {
+      if (!m_renderMode.width || !m_renderMode.height)
+        return;
+      desc->dwWidth = m_renderMode.width;
+      desc->dwHeight = m_renderMode.height;
+      if (desc->dwFlags & DDSD_PITCH) {
+        const uint64_t bits = uint64_t(m_renderMode.width) * desc->ddpfPixelFormat.dwRGBBitCount;
+        desc->lPitch = LONG(((bits + 31) / 32) * 4);
+      }
+    }
+
+    void UpdateCursorClip();
 
     DDrawModeSize* GetModeSize() {
       return &m_modeSize;
@@ -219,6 +254,7 @@ namespace dxvk {
     DWORD                             m_cooperativeLevel   = 0;
 
     DDrawCommonSurface*               m_ps                 = nullptr;
+    DDrawModeSize                     m_renderMode         = { };
     DDrawModeSize                     m_modeSize           = { };
 
     d3d9::D3DADAPTER_IDENTIFIER9      m_adapterIdentifier9 = { };

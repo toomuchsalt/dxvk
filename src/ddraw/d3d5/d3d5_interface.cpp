@@ -470,15 +470,16 @@ namespace dxvk {
     DWORD backBufferWidth  = desc.dwWidth;
     DWORD BackBufferHeight = desc.dwHeight;
 
-    if (likely(d3dOptions->backBufferResize)) {
+    if (likely(d3dOptions->backBufferResize || d3dOptions->forceDesktopMode)) {
       const bool exclusiveMode = m_commonIntf->GetCooperativeLevel() & DDSCL_EXCLUSIVE;
 
       // Ignore any mode size dimensions when in windowed present mode
       if (exclusiveMode) {
         DDrawModeSize* modeSize = m_commonIntf->GetModeSize();
         // Wayland apparently needs this for somewhat proper back buffer sizing
-        if ((modeSize->width  && modeSize->width  < desc.dwWidth)
-         || (modeSize->height && modeSize->height < desc.dwHeight)) {
+        if (modeSize->width && modeSize->height
+            && (m_commonIntf->UsesDesktopMode()
+             || modeSize->width < desc.dwWidth || modeSize->height < desc.dwHeight)) {
           Logger::info("D3D5Interface::CreateDevice: Enforcing mode dimensions");
           backBufferWidth  = modeSize->width;
           BackBufferHeight = modeSize->height;
