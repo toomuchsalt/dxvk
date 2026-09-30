@@ -1,4 +1,32 @@
-﻿# D7VK
+﻿# This is collection of hacks on top of D7VK
+## Please do not report bugs from this build to D7VK or DXVK authors
+
+I'm unlikely to be actively supporting this, as it was only made for (and tested on) a single game. 
+
+Hacks implemented:
+- Fake desktop resolution mode - hides mode switching from wine, making it possible to use any resolution below your desktop. So it is possible to run a game in 2880x2160 resolution given that it provides an option to enforce it
+    - I did not implement fake resolution enumeration, so configuration utils still won't show such resolutions
+- Accompanying the above - correct aspect ratio scaling. Only present to the central portion of the screen when trying to display a 4:3 onto 16:9 swapchain
+- Collection of hacks to improve high resolution performance
+    - ddraw.gpuBltFast
+    - ddraw.cpuBackBufferShadow
+    - Another hack making d7vk to save render target and depth-stencil mappings
+    - All above allows me to run Codename:Outbreak at 2880x2160 with stable 144 fps (up from sub 30 on vanilla d7vk)
+
+## This is a collection of HACKS, so YMMV and bugs are expected
+
+## Known bugs
+- Cursor clipping
+  - When running at resolutions above your desktop (yes, 5760×4320 is **somewhat** supported), your cursor will be clipped to the upper-left portion of the screen
+    - It can't be fixed without changes to wine and I'm not that desperate
+- Performance
+  - Even with hacks above - the games simply weren't designed to run at resolutions this high, so some games will still run as garbage
+- There are likely to be games, which use screen size for something, making them freak out when you use fake desktop mode
+
+
+# Original d7vk readme below
+
+# D7VK
 
 A Vulkan-based translation layer for Direct3D 7, 6, 5 and 3, which allows running 3D applications on Linux using Wine. It uses a modified version of DXVK's D3D9 Vulkan backend as well as Wine's DDraw implementation, or the Windows native DDraw implementation, and acts as a proxy between the two.
 
